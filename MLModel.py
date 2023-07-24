@@ -38,5 +38,5 @@ y_pred = model.predict(X_pred)
 
 print(y_pred)
 
-
+#ciao andrea
 
