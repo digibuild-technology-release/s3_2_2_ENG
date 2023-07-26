@@ -1,5 +1,6 @@
 import pandas as pd
 import glob 
+import pickle
 
 from utils import createCsv, filterDataset
 
@@ -13,8 +14,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-createCsv('resources/RVENA_23*.csv')
-input_df = filterDataset("resources/input_df.csv")
+createCsv(r's3_2_2_ENG\resources\RVENA_23*.csv')
+input_df = filterDataset(r"s3_2_2_ENG\resources\input_df.csv")
 
 X = input_df.loc[0:,['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERA 1 (15 minuto)','TEMP IMP CALDERA 2 (15 minuto)','TEMPERATURA IMPULSION ANILLO (15 minuto)','Boiler 1 Hours','Boiler 2 Hours']]  #Le x e y della mia F
 y = input_df['NG Consumption [kW]']
@@ -35,6 +36,10 @@ print(f'R^2 score: {score:.2f}')
 
 X_pred = scaler.transform(X)
 y_pred = model.predict(X_pred)
+
+# Save Model
+filename = r's3_2_2_ENG\models\ANNTrainedModel.pkl'
+pickle.dump(model, open(filename, 'wb'))
 
 print(y_pred)
 

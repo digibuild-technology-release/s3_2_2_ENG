@@ -32,7 +32,7 @@ def createCsv(input_folder):
     # Reimposta l'indice
     df_30=df.resample('30T').mean()
     #Salva il dataframe
-    df_30.to_csv("resources/input_df.csv")
+    df_30.to_csv(r"s3_2_2_ENG\resources\input_csv.csv")
 
 def filterDataset(input_df):
 
