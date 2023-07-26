@@ -43,7 +43,7 @@ def filterDataset(input_df):
     LHV_ng=9.5 #used for conversion from m3/hr to 
     eta_lim=1.40
 
-    dataset=pd.read_csv("resources/input_df.csv")
+    dataset=pd.read_csv(input_df)
     dataset['NG Consumption [kW]'] = dataset['CONSUMO GAS (30 minutos)'].diff()*LHV_ng*2
     dataset['eta'] = dataset['ENERGIA INSTANTANEA (15 minuto)']/(dataset['NG Consumption [kW]']+1)
     dataset['Boiler 1 Hours'] = dataset['Horas Funcionamiento Caldera 1 (15 minuto)'].diff()
