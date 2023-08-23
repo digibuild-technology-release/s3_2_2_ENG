@@ -24,14 +24,13 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
 
 # DataScaling using StandardScaler
 scaler = StandardScaler()
-fitted_scaler = scaler.fit(X_train)
-X_train = fitted_scaler.transform(X_train)
-X_test = fitted_scaler.transform(X_test)
+X_trainr = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
 
 
 # Model Initialization
 model = MLPRegressor(hidden_layer_sizes=(100, 200, 100), max_iter=1000000,activation='relu')
-model.fit(X_train, y_train)
+model.fit(X_train.values, y_train)
 score = model.score(X_test, y_test)
 print(f'R^2 score: {score:.2f}')
 

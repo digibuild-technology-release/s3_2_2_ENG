@@ -6,9 +6,9 @@ import pandas as pd
 import numpy as np
 
 from utils import filterDataset, createCsv
-from ANNModel import fitted_scaler
 
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
 
 from pymoo.termination.default import DefaultSingleObjectiveTermination
 from pymoo.problems.functional import FunctionalProblem
@@ -19,6 +19,12 @@ from pymoo.optimize import minimize
 createCsv(r's3_2_2_ENG\resources\RVENA_23*.csv')
 dataset = filterDataset(r"s3_2_2_ENG\resources\InputDataframe.csv")
 model = pickle.load(open(r"s3_2_2_ENG\models\ANNTrainedModel.pkl", 'rb'))
+
+X = dataset.loc[0:,['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERA 1 (15 minuto)','TEMP IMP CALDERA 2 (15 minuto)','TEMPERATURA IMPULSION ANILLO (15 minuto)','Boiler 1 Hours','Boiler 2 Hours']]  #Le x e y della mia F
+y = dataset['NG Consumption [kW]']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
+scaler = StandardScaler().fit(X_train)
 
 X_names_ann = ['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERA 1 (15 minuto)','TEMP IMP CALDERA 2 (15 minuto)','TEMPERATURA IMPULSION ANILLO (15 minuto)','Boiler 1 Hours','Boiler 2 Hours']
 input_df = dataset.copy()
@@ -33,6 +39,8 @@ optimization_df.columns = newnames
 X=5 #Set how much "kinds" of decisional variables are
 n = 372 # Set the number of "timestep" for each decisional variable
 fixed_value = 0.5 # Set the fixed value for the first constraint
+
+optimization_df = optimization_df[:n] #Limit the dataframe
 
 # Define the lower bounds for each decision variable
 lb_Tb1 = 0
@@ -64,28 +72,49 @@ def f(x):
     x_matrix = np.hstack((optimization_df['Q'].values.reshape((n, 1)), x_matrix))
 
     # Apply the scaler transformation to the decision variables matrix
-    x_matrix_scaled = fitted_scaler.transform(x_matrix)
+    x_matrix_scaled = scaler.transform(x_matrix)
 
     # Calculate the sum of the model predictions for all timesteps
     return np.sum(model.predict(x_matrix_scaled))
 
-g1 = lambda x: np.sum(x.reshape((n, X))[:, 2] - x.reshape((n, X))[:, 1])
-g2 = lambda x: np.sum(x.reshape((n, X))[:,2] - x.reshape((n, X))[:, 0])
-
-def g3(x, size1=4500*0.8, size2=4500*0.8):
+def g1(x):
     # Reshape the decision variables into a matrix with n rows and X columns
     x_matrix = x.reshape((n, X))
 
     # Calculate the constraint values for each timestep
-    g = np.sum(-(x_matrix[:, 3] * size1 + x_matrix[:, 4] * size2 - 0.5 * np.array(optimization_df['Q'].values)))
+    g = x_matrix[:, 2] - x_matrix[:, 1]
+    g=np.max(g, axis=0)
+
+    return g
+
+def g2(x):
+    # Reshape the decision variables into a matrix with n rows and X columns
+    x_matrix = x.reshape((n, X))
+
+    # Calculate the constraint values for each timestep
+    g = x_matrix[:, 2] - x_matrix[:, 0]
+    g=np.max(g, axis=0)
+
+    return g
+
+def g3(x):
+    # Reshape the decision variables into a matrix with n rows and X columns
+    x_matrix = x.reshape((n, X))
+    size1=4500*0.8   #4500kW
+    size2=4500*0.8    #4500 kW   *3600*MW -> MJ
+
+    # Calculate the constraint values for each timestep
+    g = -(x_matrix[:, 3] * size1 + x_matrix[:, 4] * size2 - 0.5 * np.array(optimization_df['Q'].values))
+
+    g=np.max(g, axis=0)
 
     return g
 
 
 #%% Optimization problem definition
 
-ngen=150
-popsize=100
+ngen = 300
+popsize = 300
 
 termination = DefaultSingleObjectiveTermination(
     xtol=1e-800,
@@ -111,7 +140,6 @@ start_time = time.time()
 
 # Run the optimization with a maximum of 50 generations
 # Limit the dataframe
-optimization_df = optimization_df[:n]
 problem = FunctionalProblem(X * n, f, constr_ieq=[g1,g2,g3], xl=lb_array, xu=ub_array)
 res = minimize(problem, algorithm, termination, seed=1, callback=callback)
 
