@@ -2,3 +2,4 @@ TestOptmizer.py
 testANN.py
 /__pycache__
 *.csv
+/notebooks
