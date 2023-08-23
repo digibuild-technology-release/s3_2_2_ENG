@@ -4,16 +4,19 @@ from sklearn.linear_model import LogisticRegression
 import pickle
 import numpy as np
 
-#from Optimizer import run_optimization
-
-# Creare un'istanza di Flask
+# Set up Flask
 app = Flask(__name__)
 auth = HTTPBasicAuth()
 
-# Caricare il modello di Machine Learning
+# Load ML Model
 model = pickle.load(open(r"s3_2_2_ENG\models\ANNTrainedModel.pkl", "rb"))
 
-# Definire una funzione che viene utilizzata per verificare le credenziali dell'utente
+# Load Optimizer
+problem = pickle.load(open(r"s3_2_2_ENG\models\OptimizerProblemTest.pkl", "rb"))
+algorithm = pickle.load(open(r"s3_2_2_ENG\models\OptimizerAlgorithmTest.pkl", "rb"))
+termination = pickle.load(open(r"s3_2_2_ENG\models\OptimizerTerminationTest.pkl", "rb"))
+
+# Verify Credentials
 @auth.verify_password
 def verify_password(username, password):
     # Controllare se le credenziali sono corrette
@@ -22,11 +25,12 @@ def verify_password(username, password):
     else:
         return False
 
+# Test Endpoint
 @app.route("/test", methods=['GET'])
 def test():
     return {"api":"connected"}
 
-#metodo che restituisce l'input della rete
+# Display Input Data
 @app.route("/print_input", methods=['POST'])
 @auth.login_required
 def returnInputData():
@@ -35,10 +39,14 @@ def returnInputData():
     features = data['features'][1]
     return jsonify({"data": features})
 
-# Creare una rotta nella Flask API
+# Prediction Endpoint
 @app.route("/predict", methods=["POST"])
 @auth.login_required
 def predict():
+
+    # Creare una variabile globale che potrà essere utilizzata in seguito
+    global prediction
+
     # Ottenere i dati in input dalla richiesta
     data = request.get_json()
     features = np.array(data["features"])
@@ -56,19 +64,27 @@ def predict():
     else:
         return {"features shape": features.shape}
 
-'''
+
+# Optimization Endpoint
 @app.route("/optimize", methods=["POST"])
 @auth.login_required
 def optimize():
+
+    import time
+    from pymoo.optimize import minimize 
     # Ottenere i dati in input dalla richiesta 
     data = request.get_json()
 
     # Eseguire la funzione di ottimizzazione
-    solution = run_optimization(data)
+    start_time = time.time()
+    res = minimize(problem, algorithm, termination, seed=1, callback=callback)
+    end_time = time.time()
 
+    totalTime = end_time-start_time*60
+    
     # Restituire la soluzione
-    return jsonify(solution=solution)
-'''
+    return jsonify({"solution":list(res.X),
+                    "exxectuion time": totalTime})
 
 # Avviare la Flask API
 if __name__ == "__main__":

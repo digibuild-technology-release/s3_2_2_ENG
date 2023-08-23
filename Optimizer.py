@@ -36,7 +36,7 @@ newnames = ['Q','Tb1','Tb2','Td','Hb1','Hb2']
 optimization_df.columns = newnames
 
 #%% Set Decisional Variables
-X=5 #Set how much "kinds" of decisional variables are
+X = 5 #Set how much "kinds" of decisional variables are
 n = 372 # Set the number of "timestep" for each decisional variable
 fixed_value = 0.5 # Set the fixed value for the first constraint
 
@@ -143,9 +143,11 @@ start_time = time.time()
 problem = FunctionalProblem(X * n, f, constr_ieq=[g1,g2,g3], xl=lb_array, xu=ub_array)
 res = minimize(problem, algorithm, termination, seed=1, callback=callback)
 
+end_time = time.time()
 #%% Print Results
 
 # Print the results
 print("Best solution found:", res.X)
 print("Objective value:", res.F)
 print("Constraint violation:", res.CV)
+print(end_time-start_time)
