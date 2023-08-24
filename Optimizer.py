@@ -15,7 +15,7 @@ from pymoo.problems.functional import FunctionalProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 
-dataset = filterDataset(r"C:\Users\annatalini\Documents\DigiBUILD-Developement\s3_2_2_ENG\resources\InputDataframe.csv")
+dataset = filterDataset(r"resources/InputDataframe.csv")
 X = dataset.loc[0:,['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERA 1 (15 minuto)','TEMP IMP CALDERA 2 (15 minuto)','TEMPERATURA IMPULSION ANILLO (15 minuto)','Boiler 1 Hours','Boiler 2 Hours']]  #Le x e y della mia F
 y = dataset['NG Consumption [kW]']
 

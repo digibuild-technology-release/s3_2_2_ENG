@@ -14,8 +14,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-createCsv(r's3_2_2_ENG\resources\RVENA*.csv')
-input_df = filterDataset(r"s3_2_2_ENG\resources\input_df.csv")
+createCsv(r'resources/RVENA*.csv')
+input_df = filterDataset(r"resources/input_df.csv")
 
 X = input_df.loc[0:,['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERA 1 (15 minuto)','TEMP IMP CALDERA 2 (15 minuto)','TEMPERATURA IMPULSION ANILLO (15 minuto)','Boiler 1 Hours','Boiler 2 Hours']]  #Le x e y della mia F
 y = input_df['NG Consumption [kW]']
@@ -38,7 +38,7 @@ X_pred = scaler.transform(X)
 y_pred = model.predict(X_pred)
 
 # Save Model
-filename = r's3_2_2_ENG\models\ANNTrainedModel.pkl'
+filename = r'models/ANNTrainedModel.pkl'
 pickle.dump(model, open(filename, 'wb'))
 
 print(y_pred)
