@@ -1,7 +1,5 @@
 from flask import Flask, request, jsonify
-from flask_httpauth import HTTPBasicAuth
-from utils import filterDataset
-from sklearn.linear_model import LogisticRegression
+from utils import filter_dataset
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import pickle
@@ -9,50 +7,52 @@ import numpy as np
 
 # Set up Flask
 app = Flask(__name__)
-auth = HTTPBasicAuth()
 
 # Load ML Model
 model = pickle.load(open(r"models/ANNTrainedModel.pkl", "rb"))
 
 # Load Dataframes
-optimization_df = filterDataset(r"resources/InputDataframe.csv")
-X = optimization_df.loc[0:,['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERA 1 (15 minuto)','TEMP IMP CALDERA 2 (15 minuto)','TEMPERATURA IMPULSION ANILLO (15 minuto)','Boiler 1 Hours','Boiler 2 Hours']]  #Le x e y della mia F
+optimization_df = filter_dataset(r"resources/InputDataframe.csv")
+X = optimization_df.loc[0:, ['ENERGIA INSTANTANEA (15 minuto)', 'TEMP IMP CALDERA 1 (15 minuto)',
+                             'TEMP IMP CALDERA 2 (15 minuto)', 'TEMPERATURA IMPULSION ANILLO (15 minuto)',
+                             'Boiler 1 Hours', 'Boiler 2 Hours']]  # Le x e y della mia F
+
 y = optimization_df['NG Consumption [kW]']
-X_names_ann = ['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERA 1 (15 minuto)','TEMP IMP CALDERA 2 (15 minuto)','TEMPERATURA IMPULSION ANILLO (15 minuto)','Boiler 1 Hours','Boiler 2 Hours']
+
+X_names_ann = ['ENERGIA INSTANTANEA (15 minuto)',
+               'TEMP IMP CALDERA 1 (15 minuto)',
+               'TEMP IMP CALDERA 2 (15 minuto)',
+               'TEMPERATURA IMPULSION ANILLO (15 minuto)',
+               'Boiler 1 Hours',
+               'Boiler 2 Hours']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
 scaler = StandardScaler().fit(X_train.values)
 
 optimization_df = optimization_df[X_names_ann]
-newnames = ['Q','Tb1','Tb2','Td','Hb1','Hb2']
-optimization_df.columns = newnames
+new_names = ['Q', 'Tb1', 'Tb2', 'Td', 'Hb1', 'Hb2']
+optimization_df.columns = new_names
 
-# Verify Credentials
-@auth.verify_password
-def verify_password(username, password):
-    # Controllare se le credenziali sono corrette
-    if username == "AndreaNatalini" and password == "Research.AN21_11":
-        return True
-    else:
-        return False
+global prediction
+
 
 # Test Endpoint
 @app.route("/test", methods=['GET'])
 def test():
-    return {"api":"connected"}
+    return {"api": "connected"}
+
 
 # Display Input Data
 @app.route("/print_input", methods=['POST'])
-@auth.login_required
-def returnInputData():
+def return_input_data():
 
     data = request.get_json()
     features = data['features'][1]
     return jsonify({"data": features})
 
+
 # Prediction Endpoint
 @app.route("/predict", methods=["POST"])
-@auth.login_required
 def predict():
 
     # Creare una variabile globale che potrà essere utilizzata in seguito
@@ -67,7 +67,7 @@ def predict():
         try:
             prediction = model.predict(features)
             # Restituire la predizione
-            return jsonify({"prediction":list(prediction)})
+            return jsonify({"prediction": list(prediction)})
         except ValueError as e:
             return jsonify(error=str(e))
         except Exception as e:
@@ -78,7 +78,6 @@ def predict():
 
 # Optimization Endpoint
 @app.route("/optimize", methods=["POST"])
-@auth.login_required
 def optimize():
 
     from Optimizer import OptimizationProblem
@@ -96,14 +95,13 @@ def optimize():
 
     end_time = time.time()
 
-    totalTime = (end_time-start_time)*60
+    total_time = (end_time-start_time)*60
     
     # Restituire la soluzione
-    return jsonify({"Best Solution":list(result.X),
-                    "Execution Time": totalTime})
+    return jsonify({"Best Solution": list(result.X),
+                    "Execution Time": total_time})
+
 
 # Avviare la Flask API
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
-

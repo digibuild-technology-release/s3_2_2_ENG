@@ -30,7 +30,7 @@ optimization_df = dataset.copy() #??
 optimization_df = optimization_df[X_names_ann]
 newnames = ['Q','Tb1','Tb2','Td','Hb1','Hb2']
 optimization_df.columns = newnames
-#optimization_df.head(5)
+# optimization_df.head(5)
 
 
 class OptimizationProblem:
@@ -112,16 +112,16 @@ class OptimizationProblem:
 
         return res
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
-#     optimization_df = optimization_df
-#     scaler = scaler
-#     model = pickle.load(open(r"C:\Users\annatalini\Documents\DigiBUILD-Developement\s3_2_2_ENG\models\ANNTrainedModel.pkl", 'rb'))
+    optimization_df = optimization_df
+    scaler = scaler
+    model = pickle.load(open(r"C:\Users\annatalini\Documents\DigiBUILD-Developement\s3_2_2_ENG\models\ANNTrainedModel.pkl", 'rb'))
 
 
-#     optimization_problem = OptimizationProblem(optimization_df, scaler, model)
-#     result = optimization_problem.optimize()
+    optimization_problem = OptimizationProblem(optimization_df, scaler, model)
+    result = optimization_problem.optimize()
 
-#     print("Best solution found:", result.X)
-#     print("Objective value:", result.F)
-#     print("Constraint violation:", result.CV)
+    print("Best solution found:", result.X)
+    print("Objective value:", result.F)
+    print("Constraint violation:", result.CV)
