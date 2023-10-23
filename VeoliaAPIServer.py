@@ -1,12 +1,43 @@
+import logging
+import pickle
+import json
+
+import numpy as np
+
 from flask import Flask, request, jsonify
+from flask_oidc import OpenIDConnect
+
+from keycloak import KeycloakOpenID
+
 from utils import filter_dataset
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-import pickle
-import numpy as np
+
+logging.basicConfig(level=logging.DEBUG)
 
 # Set up Flask
 app = Flask(__name__)
+app.config.update({
+    'SECRET_KEY': 'vqalcXI09J0EAfNdpqUFnwaFtihDNnrH',
+    'TESTING': True,
+    'DEBUG': True,
+    'OIDC_CLIENT_SECRETS': 'auth.json',
+    'OIDC_ID_TOKEN_COOKIE_SECURE': False,
+    'OIDC_REQUIRE_VERIFIED_EMAIL': False,
+    'OIDC_USER_INFO_ENABLED': True,
+    'OIDC_OPENID_REALM': 'flask-app',
+    'OIDC_SCOPES': ['openid', 'email', 'profile'],
+    'OIDC_TOKEN_TYPE_HINT': 'access_token',
+    'OIDC_INTROSPECTION_AUTH_METHOD': 'client_secret_post'
+    # 'OIDC_INTROSPECTION_AUTH_METHOD': 'bearer'
+})
+
+oidc = OpenIDConnect(app)
+
+keycloak_openid = KeycloakOpenID(server_url="http://localhost:8080/",
+                                 client_id="Flask",
+                                 realm_name="Flask-app",
+                                 client_secret_key="vqalcXI09J0EAfNdpqUFnwaFtihDNnrH")
 
 # Load ML Model
 model = pickle.load(open(r"models/ANNTrainedModel.pkl", "rb"))
@@ -38,6 +69,7 @@ global prediction
 
 # Test Endpoint
 @app.route("/test", methods=['GET'])
+@oidc.require_login
 def test():
     return {"api": "connected"}
 

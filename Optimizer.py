@@ -25,7 +25,7 @@ scaler = StandardScaler().fit(X_train)
 X_names_ann = ['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERA 1 (15 minuto)','TEMP IMP CALDERA 2 (15 minuto)','TEMPERATURA IMPULSION ANILLO (15 minuto)','Boiler 1 Hours','Boiler 2 Hours']
 input_df = dataset.copy()
 
-optimization_df = dataset.copy() #??
+optimization_df = dataset.copy()  # ??
 
 optimization_df = optimization_df[X_names_ann]
 newnames = ['Q','Tb1','Tb2','Td','Hb1','Hb2']
@@ -63,12 +63,12 @@ class OptimizationProblem:
         self.ub_array = np.array([self.ub_Tb1, self.ub_Tb2, self.ub_Td, self.ub_Hb1, self.ub_Hb2] * self.n)
 
         self.termination = DefaultSingleObjectiveTermination(
-        xtol=1e-800,
-        cvtol=1e-600,
-        ftol=0.05,
-        period=200,
-        n_max_gen=300,
-        n_max_evals=1000000000
+            xtol = 1e-800,
+            cvtol = 1e-600,
+            ftol = 0.05,
+            period = 200,
+            n_max_gen = 300,
+            n_max_evals = 1000000000
         )
 
     def f(self, x):

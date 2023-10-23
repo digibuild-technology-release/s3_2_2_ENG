@@ -3,3 +3,4 @@ testANN.py
 /__pycache__
 *.csv
 /tests
+/mlruns
