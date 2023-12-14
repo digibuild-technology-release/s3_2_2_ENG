@@ -1,0 +1,11 @@
+
+    try:
+        # Request the payload
+        data = request.get_json()
+
+        for key, data_type in input_data.items():
+            if key in input_data:
+                if not isinstance(input_data[key], data_type):
+                    return jsonify({"error": f"Campo {key} deve essere di tipo {data_type.__name__}"}), 400
+            else:
+                return jsonify({"error": f"Campo {key} mancante"}), 400

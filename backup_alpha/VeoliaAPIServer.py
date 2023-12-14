@@ -5,9 +5,6 @@ import json
 import numpy as np
 
 from flask import Flask, request, jsonify
-from flask_oidc import OpenIDConnect
-
-from keycloak import KeycloakOpenID
 
 from utils import filter_dataset
 from sklearn.model_selection import train_test_split
@@ -17,36 +14,16 @@ logging.basicConfig(level=logging.DEBUG)
 
 # Set up Flask
 app = Flask(__name__)
-app.config.update({
-    'SECRET_KEY': 'vqalcXI09J0EAfNdpqUFnwaFtihDNnrH',
-    'TESTING': True,
-    'DEBUG': True,
-    'OIDC_CLIENT_SECRETS': 'auth.json',
-    'OIDC_ID_TOKEN_COOKIE_SECURE': False,
-    'OIDC_REQUIRE_VERIFIED_EMAIL': False,
-    'OIDC_USER_INFO_ENABLED': True,
-    'OIDC_OPENID_REALM': 'flask-app',
-    'OIDC_SCOPES': ['openid', 'email', 'profile'],
-    'OIDC_TOKEN_TYPE_HINT': 'access_token',
-    'OIDC_INTROSPECTION_AUTH_METHOD': 'client_secret_post'
-    # 'OIDC_INTROSPECTION_AUTH_METHOD': 'bearer'
-})
-
-oidc = OpenIDConnect(app)
-
-keycloak_openid = KeycloakOpenID(server_url="http://localhost:8080/",
-                                 client_id="Flask",
-                                 realm_name="Flask-app",
-                                 client_secret_key="vqalcXI09J0EAfNdpqUFnwaFtihDNnrH")
 
 # Load ML Model
-model = pickle.load(open(r"models/ANNTrainedModel.pkl", "rb"))
+model = pickle.load(open(r"C:\Users\annatalini\OneDrive - Engineering Ingegneria Informatica S.p.A\DigiBUILD\DigiBUILD - Developement\s3_2_2_ENG\models\ANNTrainedModel.pkl", "rb"))
 
+"""
 # Load Dataframes
-optimization_df = filter_dataset(r"resources/InputDataframe.csv")
+optimization_df = filter_dataset(r"s3_2_2_ENG/resources/InputDataframe.csv")
 X = optimization_df.loc[0:, ['ENERGIA INSTANTANEA (15 minuto)', 'TEMP IMP CALDERA 1 (15 minuto)',
                              'TEMP IMP CALDERA 2 (15 minuto)', 'TEMPERATURA IMPULSION ANILLO (15 minuto)',
-                             'Boiler 1 Hours', 'Boiler 2 Hours']]  # Le x e y della mia F
+                             'Boiler 1 Hours', 'Boiler 2 Hours']]
 
 y = optimization_df['NG Consumption [kW]']
 
@@ -63,16 +40,67 @@ scaler = StandardScaler().fit(X_train.values)
 optimization_df = optimization_df[X_names_ann]
 new_names = ['Q', 'Tb1', 'Tb2', 'Td', 'Hb1', 'Hb2']
 optimization_df.columns = new_names
+"""
+
+"""
+
+ALGORITHM INPUT
+
+{
+
+input:
+
+    "Hours of Functioning": [],
+    "Istant Power": [], 
+    "Temp Boiler 1": [],
+    "Temp Boiler 2": [],
+    "Temp Boiler 3": [],
+    "Natural Gas Consumption": [],
+    "Thermal Energy Accuulated": [],
+    "Istant Volume": [],
+    "Boiler 1 Temperature": [],
+    "DHN Supply Temperature" : [],
+    "DHN Return Temperature": [],
+    "Serivce 3.1.3 results": {
+            define the type of results
+    }
+
+}
+
+"""
+
+input_data = {
+    
+        "input": {
+
+        "Hours of Functioning": list,
+        "Istant Power": list,
+        "Temp Boiler 1": list, 
+        "Temp Boiler 2": list, 
+        "Temp Boiler 3": list,
+        "Natural Gas Consumption": list,
+        "Thermal Energy Accumulated": list,
+        "Istant Volume": list,
+        "Boiler 1 Temperature": list,
+        "DHN Supply Temperature" : list,
+        "DHN Return Temperature": list,
+        "Predictions" : {
+
+            "Heating Prodcution Forecast": list,
+            "Heating Demand Forecast": list,
+            "PV Production Forecast": list
+
+        }
+
+    }
+}
 
 global prediction
 
-
 # Test Endpoint
 @app.route("/test", methods=['GET'])
-@oidc.require_login
 def test():
     return {"api": "connected"}
-
 
 # Display Input Data
 @app.route("/print_input", methods=['POST'])
@@ -122,7 +150,7 @@ def optimize():
 
     start_time = time.time()
     
-    optimization_problem = OptimizationProblem(optimization_df, scaler, model)
+    optimization_problem = OptimizationProblem(model) 
     result = optimization_problem.optimize()
 
     end_time = time.time()

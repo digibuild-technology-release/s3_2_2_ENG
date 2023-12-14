@@ -1,0 +1,19 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+flask = "*"
+joblib = "*"
+pandas = "*"
+scikit-learn = "*"
+seaborn = "*"
+pymoo = "*"
+flask-limiter = "*"
+
+[dev-packages]
+ipykernel = "*"
+
+[requires]
+python_version = "3.12"
