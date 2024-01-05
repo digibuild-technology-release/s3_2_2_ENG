@@ -213,15 +213,13 @@ class Optimizer:
         
         x_matrix = np.hstack((self.final_df['ENERGIA INSTANTANEA (15 minuto)'].values.reshape((self.n, 1)), x_matrix))
         x_matrix = pd.DataFrame(x_matrix, columns=['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERAS (15 minuto)'])
-
-        
+       
         # Apply the scaler transformation to the decision variables matrix
         x_matrix_scaled = self.scaler.transform(x_matrix)
         
         # Calculate the sum of the model predictions for all timesteps
         eta=self.model.predict(x_matrix_scaled)
-        
-        
+             
         f=self.final_df['ENERGIA INSTANTANEA (15 minuto)'].values/eta
         
         return np.sum(f)
