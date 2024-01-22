@@ -2,6 +2,7 @@ import logging
 import pickle
 import os
 import glob
+import threading
 
 import numpy as np
 import pandas as pd
@@ -30,7 +31,6 @@ app = Flask(__name__)
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=['1/minute'],
     storage_uri="memory://"
 )
 
@@ -289,7 +289,7 @@ class Optimizer:
 
         return solution, df_solutions
     
-@app.route('/')
+@app.route('/status')
 def check_status():
     return {'api':'connected'}
 
@@ -400,8 +400,7 @@ def optimizer_test():
         
     except Exception as e:
 
-        return jsonify({'error': str(e)})   
-
+        return jsonify({'error': str(e)})
 
 if __name__ == '__main__':
 
