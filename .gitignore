@@ -1,1 +1,8 @@
 resources/datasets
+resources/requestData
+resources/notebooks/.pytest_cache
+resources/notebooks/db.ipynb
+
+backup_alpha
+.pytest_cache
+__pycache__

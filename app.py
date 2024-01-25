@@ -3,6 +3,7 @@ import pickle
 import os
 import glob
 import threading
+import sqlite3
 
 import numpy as np
 import pandas as pd
@@ -41,6 +42,25 @@ global scaler_fitted
 
 class MLModel:
 
+    """
+    Class representing a machine learning model.
+
+    Attributes:
+        LHV (int): Lower Heating Value in kj/m3.
+        LHV_ng (int): Lower Heating Value for natural gas.
+        eta_lim (float): Limit for efficiency.
+        zeros (int): Flag indicating whether to include zeros in the dataset.
+        random_seed (int): Random seed for reproducibility.
+        scaler (StandardScaler): Scaler object for data normalization.
+
+    Methods:
+        create_input(path: str, save_local_file: bool, **file_format: str) -> tuple:
+            Create input data from files in the specified path and return processed dataframes.
+
+        train_MLModel() -> tuple:
+            Train the machine learning model and return the trained model, score, and scaler object.    
+    """
+
     def __init__(self):
 
         self.LHV = 37411 # kj/m3
@@ -53,9 +73,24 @@ class MLModel:
 
     # Creazione del dataframe
 
-    def create_input(self, path, save_local_file, **file_format):
 
-        "Creazione DataFrame Completo"
+    def create_input(self, path: str, save_local_file: bool, **file_format:str): 
+
+        """
+        Create input data from files in the specified path and return processed dataframes.
+
+        Args:
+            path (str): The path to the files.
+            save_local_file (bool): Flag indicating whether to save the processed dataset locally.
+            **file_format (str): The file format to save the dataset in.
+
+        Returns:
+            tuple: A tuple containing three dataframes: df_30, dataset, and temp_df.
+                - df_30: The processed dataframe with resampled data.
+                - dataset: The filtered and transformed dataset.
+                - temp_df: A temporary copy of the dataset before filtering.
+
+        """
 
         #Genera una lista fatta da tutti i nomi che rientrano nella richiesta 
 
@@ -64,8 +99,8 @@ class MLModel:
         df=pd.DataFrame()
 
         for nomi in nomifiles:
-            A0=pd.read_csv(nomi, sep=';', header=None)
-            df=pd.concat([df,A0])
+            A0 = pd.read_csv(nomi, sep=';', header=None)
+            df = pd.concat([df,A0])
 
 
         nomi_originali = df.iloc[:,2].unique() #Vediamo quante grandezze vengono studiate
@@ -75,22 +110,24 @@ class MLModel:
         df=df.drop(df.columns[0],axis=1)
 
 
-        df.columns = ['nome', 'orario', 'valore'] #Cambiamo il nome delle colonne
+        df.columns = ['nome', 'orario', 'valore'] # Cambiamo il nome delle colonne
 
-        df['valore']=df['valore'].str.replace(',', '.') #Aggiustiamo i valori del dataframe 
-        df['valore']=df['valore'].str.strip() #Serve per togliere tutti gli spazi da quella colonna
-        df['valore']=df['valore'].astype(float) #Rendiamo la colonna dei numeri float
+        df['valore'] = df['valore'].str.replace(',', '.') # Aggiustiamo i valori del dataframe 
+        df['valore'] = df['valore'].str.strip() # Serve per togliere tutti gli spazi da quella colonna
+        df['valore'] = df['valore'].astype(float) # Rendiamo la colonna dei numeri float
 
 
         # Crea un nuovo dataframe con gli orari come prima colonna
 
-        df = df.pivot(index='orario', columns='nome', values='valore')
+        df = df.pivot(index='orario', columns='nome', values='valore') #TODO questo pivot genera problemi
 
         df.index = pd.to_datetime(df.index)
+        
 
         # Reimposta l'indice
 
         df_30 = df.resample('30T').mean()
+        temp_1 = df_30.copy()
         # df_30=df.resample('15T').interpolate()
 
 
@@ -108,9 +145,9 @@ class MLModel:
         dataset['Boiler 1 Hours'] = dataset['Horas Funcionamiento Caldera 1 (15 minuto)'].diff()
         dataset['Boiler 2 Hours'] = dataset['Horas Funcionamiento Caldera 2 (15 minuto)'].diff()
         dataset['Boiler 3 Hours'] = dataset['Horas Funcionamiento Caldera 3 (15 minuto)'].diff()
-        dataset['Boiler 3 Hours']=dataset['Boiler 3 Hours'].replace(np.nan, 0)
+        dataset['Boiler 3 Hours'] = dataset['Boiler 3 Hours'].replace(np.nan, 0)
 
-        dataset['BH']=dataset['Boiler 1 Hours']+dataset['Boiler 2 Hours']
+        dataset['BH'] = dataset['Boiler 1 Hours'] + dataset['Boiler 2 Hours'] #TODO ci serve davvero?
 
         dataset=pd.DataFrame(dataset)
 
@@ -122,14 +159,15 @@ class MLModel:
                                             #and row['BH'] > 0.05
                                             else 1, axis=1) #applica il se
         else:
-            #Filtro ma lascio gli zeri
-            dataset['filter'] = dataset.apply(lambda row: 0 if row['eta'] < self.eta_lim else 1, axis=1) #applica il se
+            # Filtro ma lascio gli zeri
+            dataset['filter'] = dataset.apply(lambda row: 0 if row['eta'] < self.eta_lim else 1, axis=1) # applica il se
 
-        #Elimino i nan
+        # Elimino i nan
 
         dataset = dataset.loc[dataset['filter'] != 1]
-        dataset=dataset.drop('BH', axis=1)
-        dataset=dataset.drop('filter', axis=1)
+        dataset = dataset.drop('BH', axis=1)
+        temp_df = dataset.copy()
+        dataset = dataset.drop('filter', axis=1)
 
         dataset.fillna(0, inplace=True)
 
@@ -140,9 +178,18 @@ class MLModel:
         else:
             pass
 
-        return df_30, dataset
+        return df_30, dataset, temp_df, temp_1
     
     def train_MLModel(self):
+
+        """
+
+        Train the machine learning model and return the trained model, score, and scaler object.
+
+        Returns:
+            tuple: A tuple containing the trained model, score, and scaler object.
+
+        """
 
         dataset = self.create_input('resources/RVENA_23*.csv', save_local_file=False)[1]
 
@@ -187,7 +234,7 @@ class Optimizer:
 
     def __init__(self, dataset, model, n_gen, pop_size):
         
-        self.optimization_df = dataset.copy()
+        self.optimization_df = dataset.iloc[:48].copy()
         self.X = 1
         self.n = len(dataset)
         self.start_o = 0
@@ -199,7 +246,7 @@ class Optimizer:
         self.random_seed = 1
 
         self.scaler = StandardScaler()
-            
+      
     def f(self, x):
 
         # Reshape the decision variables into a matrix with n rows and X columns
@@ -224,7 +271,6 @@ class Optimizer:
         
         return np.sum(f)
     
-
     def f_values(self, x):
 
         # Reshape the decision variables into a matrix with n rows and X columns
@@ -276,24 +322,23 @@ class Optimizer:
         self.optimized_gas = res.F
         self.temperature = res.X.reshape(self.n,self.X)
 
-        df_solutions = self.f_values(res.X)
+        df_solutions = pd.DataFrame(self.temperature, columns=['Temperatures'])
 
-        solution = {'Strategy':{
-            'realGas': int(self.gas_real),
-            'OptimizedGas': int(self.optimized_gas),
-            'Saved Gas': float((self.gas_real-self.optimized_gas)/2),
-            'Saved Cost': float(100*(1-self.optimized_gas/self.gas_real)),
-            'Strategy': res.X.reshape(self.n, self.X).tolist()
+        solution = {"Strategy":{
+            "realGas": int(self.gas_real), #TODO Add unit of meausure
+            "OptimizedGas": int(self.optimized_gas), #TODO add unit of measure
+            "Saved Gas": float((self.gas_real-self.optimized_gas)/2), #TODO add unit of measure
+            "Saved Cost": float(100*(1-self.optimized_gas/self.gas_real)), #TODO specify value
+            "Strategy": res.X.reshape(self.n, self.X).tolist() #TODO add timestamps
 
         }}
-
+        
         return solution, df_solutions
-    
+
 @app.route('/status')
 def check_status():
     return {'api':'connected'}
 
-@limiter.limit("1/hour")
 @app.route('/digibuild/s322/optimizer', methods=['POST'])
 def upload_csv():
 
@@ -333,7 +378,6 @@ def upload_csv():
     except Exception as e:
         return jsonify({'error': str(e)})
     
-@limiter.limit("1/minute")
 @app.route('/digibuild/s322/train-model', methods=['POST'])
 def train_ml_model():
 
@@ -347,7 +391,7 @@ def train_ml_model():
 
         if file and file.filename.endswith('.csv'):
         
-            dataset = MLModel().create_input('resources/RVENA_23*.csv', save_local_file=True, file_format='.csv')[1]
+            dataset = MLModel().create_input('resources/requestData/RVENA_23*.csv', save_local_file=True, file_format='.csv')[1]
             r2_score = MLModel().train_MLModel()[1]
 
             response = {'status': {
@@ -363,7 +407,6 @@ def train_ml_model():
 
         return jsonify({'error': str(e)})
     
-@limiter.limit("1 per hour")
 @app.route('/digibuild/s322/optimizer_test', methods = ['POST'])
 def optimizer_test():
 
@@ -373,7 +416,7 @@ def optimizer_test():
         if 'csvFile' not in request.files:
 
             model = pickle.load(open('resources/models/TrainedModel.pkl', 'rb'))
-            solution = Optimizer(MLModel().create_input('resources/dataset/RVENA_23*.csv', save_local_file=False)[1], model, 100, 200).optimize()[0]
+            solution = Optimizer(MLModel().create_input('resources/requestData/RVENA_23*.csv', save_local_file=False)[1], model, 100, 200).optimize()[0]
 
             return jsonify(solution)
 
