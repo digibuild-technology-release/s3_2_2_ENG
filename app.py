@@ -318,18 +318,21 @@ class Optimizer:
         self.problem = FunctionalProblem(self.X * self.n, self.f, constr_ieq=[], xl=60, xu=90)
 
         start = time.time()
+        logging.info("Starting Optimization")
         res = minimize(self.problem, algorithm, self.termination, seed=1, callback = callback)
+        logging.info("Optimization Ended, Returning Results")
         end = time.time()
         
         total_time = (end-start)/60
 
+        self.temperature = res.X.reshape(self.n,self.X)
         df_solutions = pd.DataFrame(self.temperature, columns=['Temperatures'])
         final_df = self.optimization_df[['ENERGIA INSTANTANEA (15 minuto)', 'VOLUMEN INSTANTANEO (15 minuto)', 'NG Consumption [kW]',  'eta', 'Boiler 1 Hours', 'Boiler 2 Hours','Boiler 3 Hours']]
         final_df['Optmized Temperatures'] = df_solutions['Temperatures'].values
         
         self.gas_real = final_df['NG Consumption [kW]'].sum()/2 # Total NG Consumption in kWh
         self.optimized_gas = res.F/2 # Optmized Gas Consumptiopn in kWh
-        self.temperature = res.X.reshape(self.n,self.X)
+        
         
 
         solution = {"Solution":{
