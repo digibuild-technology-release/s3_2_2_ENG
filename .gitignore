@@ -1,5 +1,5 @@
 resources/datasets
-resources/requestData
+resources/requestData/*
 resources/notebooks/.pytest_cache
 resources/notebooks/db.ipynb
 

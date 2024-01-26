@@ -4,6 +4,7 @@ import os
 import glob
 import threading
 import sqlite3
+import time
 
 import numpy as np
 import pandas as pd
@@ -316,21 +317,28 @@ class Optimizer:
 
         self.problem = FunctionalProblem(self.X * self.n, self.f, constr_ieq=[], xl=60, xu=90)
 
+        start = time.time()
         res = minimize(self.problem, algorithm, self.termination, seed=1, callback = callback)
-
-        self.gas_real = self.f(np.array(self.final_df.loc[:,['TEMP IMP CALDERAS (15 minuto)']]))
-        self.optimized_gas = res.F
-        self.temperature = res.X.reshape(self.n,self.X)
+        end = time.time()
+        
+        total_time = (end-start)/60
 
         df_solutions = pd.DataFrame(self.temperature, columns=['Temperatures'])
+        final_df = self.optimization_df[['ENERGIA INSTANTANEA (15 minuto)', 'VOLUMEN INSTANTANEO (15 minuto)', 'NG Consumption [kW]',  'eta', 'Boiler 1 Hours', 'Boiler 2 Hours','Boiler 3 Hours']]
+        final_df['Optmized Temperatures'] = df_solutions['Temperatures'].values
+        
+        self.gas_real = final_df['NG Consumption [kW]'].sum()/2 # Total NG Consumption in kWh
+        self.optimized_gas = res.F/2 # Optmized Gas Consumptiopn in kWh
+        self.temperature = res.X.reshape(self.n,self.X)
+        
 
-        solution = {"Strategy":{
-            "realGas": int(self.gas_real), #TODO Add unit of meausure
-            "OptimizedGas": int(self.optimized_gas), #TODO add unit of measure
-            "Saved Gas": float((self.gas_real-self.optimized_gas)/2), #TODO add unit of measure
-            "Saved Cost": float(100*(1-self.optimized_gas/self.gas_real)), #TODO specify value
-            "Strategy": res.X.reshape(self.n, self.X).tolist() #TODO add timestamps
-
+        solution = {"Solution":{
+            "realGas": f"Total NG Consumption {self.gas_real} kWh", 
+            "OptimizedGas": f" Optmized Gas Consumption {int(self.optimized_gas)} kWh", 
+            "Saved Gas": f"Total Gas Saved {float((self.gas_real-self.optimized_gas))} kWh",
+            "Saved Cost": f"Saved Cost {float(100*(1-self.optimized_gas/self.gas_real))}%", #TODO specify value
+            "Strategy": final_df.to_json(orient='columns'),
+            "Total Execution Time": f"{(end-start)/60} seconds"
         }}
         
         return solution, df_solutions
@@ -414,9 +422,19 @@ def optimizer_test():
 
         # Verifica se la richiesta contiene un file CSV
         if 'csvFile' not in request.files:
+            
+            start = time.time()
 
             model = pickle.load(open('resources/models/TrainedModel.pkl', 'rb'))
-            solution = Optimizer(MLModel().create_input('resources/requestData/RVENA_23*.csv', save_local_file=False)[1], model, 100, 200).optimize()[0]
+            dataset = MLModel().create_input(r'resources/requestData/RVENA_23*.csv', save_local_file=True)[2].iloc[:48]
+            optimizer = Optimizer(dataset, model, 100, 200).optimize()
+            solution = optimizer[0]
+            df_temps = optimizer[1]
+            # dataset['Optmized Temperatures'] = df_temps['Temperature']
+            
+            end = time.time()
+            
+            total_time = (end-start)/60
 
             return jsonify(solution)
 
@@ -424,16 +442,9 @@ def optimizer_test():
 
         if file and file.filename.endswith('.csv'):
 
-            # csv_string = file.stream.read().decode('utf-8')
-            # csv_file = StringIO(csv_string)
-
-            # dataset = pd.read_csv(file)
-
-            ##TODO Code to launch optimizer
-
             model = pickle.load(open('resources/models/TrainedModel.pkl', 'rb'))
 
-            solution = Optimizer(MLModel().create_input('resources/requestData/RVENA_23*.csv', save_local_file=False)[1], model, 100, 200).optimize()[0]
+            solution = Optimizer(MLModel().create_input('resources/requestData/RVENA_23*.csv', save_local_file=False)[3].iloc[:48], model, 100, 200).optimize()[0]
             logging.info({'status': 'Ottimizzazione lanciata con successo'})
 
             return jsonify(solution)
