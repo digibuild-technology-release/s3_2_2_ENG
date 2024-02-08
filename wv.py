@@ -13,11 +13,11 @@ from io import StringIO
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 from pymoo.problems.functional import FunctionalProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
@@ -62,13 +62,13 @@ class MLModel:
             Train the machine learning model and return the trained model, score, and scaler object.    
     """
 
-    def __init__(self, LHV:int, eta_lim:float):
+    def __init__(self):
 
-        self.LHV = LHV # kj/m3
+        self.LHV = 37411 # kj/m3
         self.LHV_ng = self.LHV # Used for conversion from m3/hr to 
-        self.eta_lim = eta_lim 
+        self.eta_lim = 1.3 
         self.zeros = 1
-        self.random_seed = 42
+        self.random_seed = 1
 
         self.scaler = StandardScaler()
 
@@ -103,15 +103,20 @@ class MLModel:
             A0 = pd.read_csv(nomi, sep=';', header=None)
             df = pd.concat([df,A0])
 
+
+        nomi_originali = df.iloc[:,2].unique() #Vediamo quante grandezze vengono studiate
+
         # elimina le colonne 'a' e 'b' dal dataframe
         df=df.drop(df.columns[0],axis=1)
         df=df.drop(df.columns[0],axis=1)
+
 
         df.columns = ['nome', 'orario', 'valore'] # Cambiamo il nome delle colonne
 
         df['valore'] = df['valore'].str.replace(',', '.') # Aggiustiamo i valori del dataframe 
         df['valore'] = df['valore'].str.strip() # Serve per togliere tutti gli spazi da quella colonna
         df['valore'] = df['valore'].astype(float) # Rendiamo la colonna dei numeri float
+
 
         # Crea un nuovo dataframe con gli orari come prima colonna
 
@@ -128,10 +133,8 @@ class MLModel:
 
 
         #Limitati al temo di funzionamento B1-2
-        df_30_1 = df_30.loc[:'2023-06-07 00:00:00']
-        df_30_2 = df_30.loc['2023-10-17 19:00:00':]
 
-        df_30 = pd.concat([df_30_1, df_30_2])
+        df_30 = df_30.loc['2023-06-07 00:00:00':'2023-10-17 19:00:00']
 
         dataset = df_30.copy()
 
@@ -145,45 +148,38 @@ class MLModel:
         dataset['Boiler 3 Hours'] = dataset['Horas Funcionamiento Caldera 3 (15 minuto)'].diff()
         dataset['Boiler 3 Hours'] = dataset['Boiler 3 Hours'].replace(np.nan, 0)
 
-        # dataset['BH'] = dataset['Boiler 1 Hours'] + dataset['Boiler 2 Hours']
+        dataset['BH'] = dataset['Boiler 1 Hours'] + dataset['Boiler 2 Hours'] #TODO ci serve davvero?
 
-        dataset = pd.DataFrame(dataset)
+        dataset=pd.DataFrame(dataset)
 
-        # if self.zeros==1:
-        #     #Elimino gli zeri da boiler hours
-        #     dataset['filter'] = dataset.apply(lambda row: 0 if row['eta'] < self.eta_lim and
-        #                                     row['ENERGIA INSTANTANEA (15 minuto)'] > 50
-        #                                     and row['NG Consumption [kW]'] > 50
-        #                                     #and row['BH'] > 0.05
-        #                                     else 1, axis=1) #applica il se
-        # else:
-        #     # Filtro ma lascio gli zeri
-        #     dataset['filter'] = dataset.apply(lambda row: 0 if row['eta'] < self.eta_lim else 1, axis=1) # applica il se
-        
-        df_30_exp = dataset.copy()
- 
-        dataset = dataset.loc[dataset['eta'] <= self.eta_lim]
-        
+        if self.zeros==1:
+            #Elimino gli zeri da boiler hours
+            dataset['filter'] = dataset.apply(lambda row: 0 if row['eta'] < self.eta_lim and
+                                            row['ENERGIA INSTANTANEA (15 minuto)'] > 50
+                                            and row['NG Consumption [kW]'] > 50
+                                            #and row['BH'] > 0.05
+                                            else 1, axis=1) #applica il se
+        else:
+            # Filtro ma lascio gli zeri
+            dataset['filter'] = dataset.apply(lambda row: 0 if row['eta'] < self.eta_lim else 1, axis=1) # applica il se
 
         # Elimino i nan
 
-        # dataset = dataset.loc[dataset['filter'] != 1]
-        # dataset = dataset.drop('BH', axis=1)
-        # temp_df = dataset.copy()
-        # dataset = dataset.drop('filter', axis=1)
+        dataset = dataset.loc[dataset['filter'] != 1]
+        dataset = dataset.drop('BH', axis=1)
+        temp_df = dataset.copy()
+        dataset = dataset.drop('filter', axis=1)
 
         dataset.fillna(0, inplace=True)
 
         if (save_local_file == True and file_format == '.xlsx'):
-            dataset.to_excel('resources/dataset/TrainingDataset.xlsx')
-            dataset.to_excel('resources/dataset/df_30_exp.xlsx')
+            dataset.to_excel('resources/TrainingDataset.xlsx')
         elif (save_local_file == True and file_format == '.csv'):
-            dataset.to_csv('resources/dataset/TraningDataset.csv')
-            dataset.to_excel('resources/dataset/df_30_exp.xlsx')
+            dataset.to_csv('resources/TraningDataset.csv')
         else:
             pass
 
-        return dataset, df_30_exp
+        return df_30, dataset, temp_df, temp_1
     
     def train_MLModel(self):
 
@@ -196,9 +192,9 @@ class MLModel:
 
         """
 
-        dataset = self.create_input('resources/requestData/RVENA_23*.csv', save_local_file=False)[0]
+        dataset = self.create_input('resources/RVENA_23*.csv', save_local_file=False)[1]
 
-        X = dataset.loc[:,['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERAS (15 minuto)']]
+        X = dataset.loc[:,['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERAS (15 minuto)']]  #Le x e y della mia F
         y = dataset.loc[:,['eta']]
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=self.random_seed)
@@ -206,29 +202,19 @@ class MLModel:
         X_train = scaler_fitted.transform(X_train)
         X_test = scaler_fitted.transform(X_test)
 
-        # Definition of the Gradient Boosting Regrrssion Model
-        
-        regressor = GradientBoostingRegressor(loss='squared_error',
-                                      learning_rate=0.1,
-                                      n_estimators=100,
-                                      random_state=42)
- 
-        regressor.fit(X_train, y_train)
-        
-        y_pred = regressor.predict(X_test)
-        
-        mse = mean_absolute_error(y_test, y_pred)
-        print(f"Mean Squared Error: {mse:.2f}")
-        
-        r2 = r2_score(y_test, y_pred)
-        print(f'R^2 score: {r2:.2f}')
-        
-        X_scaled = self.scaler.transform(X)    #Utilizzo lo stesso scaler che è stato fittato prima
-        y_pred = regressor.predict(X_scaled)
-        
-        trained_model = regressor.fit(X_train, y_train)
+        # Definition of the ANN Model
 
-        pickle.dump(trained_model, open(r"resources/models/TrainedModel.pkl", 'wb'))
+        model = MLPRegressor(hidden_layer_sizes=(20, 100,300,100, 20),
+                            max_iter=100000000,
+                            verbose=True,
+                            solver='adam',
+                            learning_rate='adaptive',
+                            random_state=self.random_seed,
+                            activation='relu')
+        
+        trained_model = model.fit(X_train, y_train)
+
+        pickle.dump(trained_model, open("resources/models/TrainedModel.pkl", 'wb'))
 
         # Valutazione delle prestazioni del modello sui dati di test
 
@@ -238,76 +224,84 @@ class MLModel:
         # Utilizzo del modello per fare previsioni sui dati di test
 
         X_pred = self.scaler.transform(X)    #Utilizzo lo stesso scaler che è stato fittato prima
-        y_pred = regressor.predict(X_pred)
+        y_pred = model.predict(X_pred)
 
-        return regressor, score, scaler_fitted
+        return model, score, scaler_fitted
 
     # dataset = create_input('resources/RVENA_23*.csv', save_local_file=False)[1]
     # dataset.head()
 
 class Optimizer:
 
-    def __init__(self, dataset, df_o, model, starting_h_optimization, n_gen=80, pop_size=150):
+    def __init__(self, dataset, model, n_gen, pop_size):
         
         self.optimization_df = dataset.iloc[:48].copy()
         self.X = 1
         self.n = len(dataset)
-        self.starting_h_optimization = starting_h_optimization
-        self.start_o = 1012
+        self.start_o = 0
         self.final_df = self.optimization_df[self.start_o:self.start_o + self.n]
         self.model = model
         self.fixed_value = 0.5
         self.ngen = n_gen
         self.pop_size = pop_size
-        self.random_seed = 42
-        self.df_o = df_o
-        self.n_no = len(self.df_o)
-        
-        # self.df_o_no = df_o.loc[df_o['ENERGIA INSTANTANEA (15 minuto)'] != 0]
+        self.random_seed = 1
 
         self.scaler = StandardScaler()
       
     def f(self, x):
-        
-        """
-        Calculate the sum of the model predictions for all timesteps.
 
-        Parameters:
-        x (numpy.ndarray): The decision variables.
-        Calculate the sum of the model predictions for all timesteps.
-
-        Parameters:
-        x (numpy.ndarray): The decision variables.
-
-        Returns:
-        float: The sum of the model predictions.
-        """
-        
         # Reshape the decision variables into a matrix with n rows and X columns
-        x_matrix = x.reshape((self.n_no, self.X))
-        
-        self.df_o = self.df_o[self.starting_h_optimization:self.starting_h_optimization+self.n_no]
-        self.df_o = self.df_o.loc[self.df_o['ENERGIA INSTANTANEA (15 minuto)'] != 0] # questo è df_n_no
-        
+        x_matrix = x.reshape((self.n, self.X))
+
         X = self.optimization_df.loc[:,['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERAS (15 minuto)']]  #Le x e y della mia F
         y = self.optimization_df.loc[:,['eta']]
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=self.random_seed)
         scaler_fitted = self.scaler.fit(X_train)        
         
-        x_matrix = np.hstack((self.df_o[['ENERGIA INSTANTANEA (15 minuto)']].reshape((self.n_no, 1)), x_matrix))
+        x_matrix = np.hstack((self.final_df['ENERGIA INSTANTANEA (15 minuto)'].values.reshape((self.n, 1)), x_matrix))
         x_matrix = pd.DataFrame(x_matrix, columns=['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERAS (15 minuto)'])
        
         # Apply the scaler transformation to the decision variables matrix
         x_matrix_scaled = self.scaler.transform(x_matrix)
         
         # Calculate the sum of the model predictions for all timesteps
-        eta = self.model.predict(x_matrix_scaled)
+        eta=self.model.predict(x_matrix_scaled)
+             
+        f=self.final_df['ENERGIA INSTANTANEA (15 minuto)'].values/eta
         
-        energia_instantanea = self.df_o['ENERGIA INSTANTANEA (15 minuto)'].values     
-        self.f = np.where(energia_instantanea == 0, 0, energia_instantanea / eta)
+        return np.sum(f)
+    
+    def f_values(self, x):
+
+        # Reshape the decision variables into a matrix with n rows and X columns
+        x_matrix = x.reshape((self.n, self.X))
         
-        return np.sum(self.f)
+        x_matrix = np.hstack((self.final_df['ENERGIA INSTANTANEA (15 minuto)'].values.reshape((self.n, 1)), x_matrix))
+        x_matrix = pd.DataFrame(x_matrix, columns=['ENERGIA INSTANTANEA (15 minuto)','TEMP IMP CALDERAS (15 minuto)'])
+
+        
+        # Apply the scaler transformation to the decision variables matrix
+        x_matrix_scaled = self.scaler.transform(x_matrix)
+        
+        # Calculate the sum of the model predictions for all timesteps
+        eta=self.model.predict(x_matrix_scaled)
+        
+        eta = np.clip(eta, a_min=None, a_max=1.3)
+
+        f=self.final_df['ENERGIA INSTANTANEA (15 minuto)'].values/eta
+    
+        return f
+
+    def g1(self, x):
+        # Reshape the decision variables into a matrix with n rows and X columns
+        x_matrix = x.reshape((self.n, self.X))
+        
+        # Calculate the constraint values for each timestep
+        g = x_matrix[:, 2] - x_matrix[:, 1]
+        g=np.max(g, axis=0)
+        
+        return g
     
     def optimize(self):
             
@@ -320,37 +314,27 @@ class Optimizer:
             print(f"Generation: {(100*algorithm.n_gen/self.ngen):.2f}%")
             best_objective_value = algorithm.pop.get("F").min()
             self.best_objective_values.append(best_objective_value)
-            
-        # xl = min(self.df_o['TEMP IMP CALDERAS (15 minuto)'])
-        # xu = max(self.df_o['TEMP IMP CALDERAS (15 minuto)'])
 
-        self.problem = FunctionalProblem(self.X * self.n_no, self.f, constr_ieq=[], xl = 65, xu = 85)
+        self.problem = FunctionalProblem(self.X * self.n, self.f, constr_ieq=[], xl=60, xu=90)
 
         start = time.time()
         logging.info("Starting Optimization")
-        # print(self.df_o)
         res = minimize(self.problem, algorithm, self.termination, seed=1, callback = callback)
         logging.info("Optimization Ended, Returning Results")
         end = time.time()
         
         total_time = (end-start)/60
 
-        self.temperature = res.X.reshape(self.n, self.X)
+        self.temperature = res.X.reshape(self.n,self.X)
         df_solutions = pd.DataFrame(self.temperature, columns=['Temperatures'])
-        final_df = self.df_o[['ENERGIA INSTANTANEA (15 minuto)', 'VOLUMEN INSTANTANEO (15 minuto)', 'NG Consumption [kW]',  'eta', 'Boiler 1 Hours', 'Boiler 2 Hours','Boiler 3 Hours']]
+        final_df = self.optimization_df[['ENERGIA INSTANTANEA (15 minuto)', 'VOLUMEN INSTANTANEO (15 minuto)', 'NG Consumption [kW]',  'eta', 'Boiler 1 Hours', 'Boiler 2 Hours','Boiler 3 Hours']]
         final_df['Optmized Temperatures'] = df_solutions['Temperatures'].values
         
-        start_date = self.df_o.index[0]
-        end_date = self.df_o.index[self.n-1]
-        self.gas_real = (self.f(x=np.array(self.df_o.loc[start_date:end_date, ['TEMP IMP CALDERAS (15 minuto)']]),n=self.n,df_o=self.df_o))/2 # Total NG Consumption in kWh
+        self.gas_real = final_df['NG Consumption [kW]'].sum()/2 # Total NG Consumption in kWh
         self.optimized_gas = res.F/2 # Optmized Gas Consumptiopn in kWh
         
-        temperature=res.X[0].reshape(self.n_no, self.X)
-        slm = res.X[0]
         
-        df_solutions = self.f[1](slm)
-        gas_solutions = self.f[1](np.array(self.df_o.loc[start_date:end_date, ['TEMP IMP CALDERAS (15 minuto)']]),n=self.n, df_o=self.df_o)   
-    
+
         solution = {"Solution":{
             "TotalNGConsumption": self.gas_real, #kWh
             "Optmized Gas Consumption": int(self.optimized_gas), #kWh
@@ -445,7 +429,7 @@ def optimizer_test():
             start = time.time()
 
             model = pickle.load(open('resources/models/TrainedModel.pkl', 'rb'))
-            dataset = MLModel(39748, 1.02*1.05).create_input(r'resources/requestData/RVENA_23*.csv', save_local_file=False)[0].iloc[:48]
+            dataset = MLModel().create_input(r'resources/requestData/RVENA_23*.csv', save_local_file=True)[2].iloc[:48]
             optimizer = Optimizer(dataset, model, 100, 200).optimize()
             solution = optimizer[0]
             df_temps = optimizer[1]
@@ -463,7 +447,7 @@ def optimizer_test():
 
             model = pickle.load(open('resources/models/TrainedModel.pkl', 'rb'))
 
-            solution = Optimizer(MLModel(39748, 1.02*1.05).create_input('resources/requestData/RVENA_23*.csv', save_local_file=False)[1].iloc[:48], model, 100, 200).optimize()[0]
+            solution = Optimizer(MLModel().create_input('resources/requestData/RVENA_23*.csv', save_local_file=False)[3].iloc[:48], model, 100, 200).optimize()[0]
             logging.info({'status': 'Ottimizzazione lanciata con successo'})
 
             return jsonify(solution)
@@ -477,10 +461,13 @@ def optimizer_test():
 
 if __name__ == '__main__':
 
+    dataset = MLModel().create_input('resources/requestData/RVENA_23*.csv', save_local_file=False)[1]
+    # print(dataset.head(10))
     model = pickle.load(open('resources/models/TrainedModel.pkl', 'rb'))
-    dataset = MLModel(39748, 1.02*1.05).create_input(r'resources/requestData/RVENA_23*.csv', save_local_file=False)[0].iloc[:48]
-    optimizer = Optimizer(dataset, model, 100, 200).optimize()
-    solution = optimizer[0]
-    df_temps = optimizer[1]
+    # r2_score = MLModel().train_MLModel()[1]
+    # print(r2_score)
+
+    solution = Optimizer(dataset, model, 100, 200).optimize()[0]
+    print(solution)
 
     # app.run(host="0.0.0.0", port = 5000, debug = True)
